@@ -1,0 +1,12 @@
+apiVersion: validation.redhat.com/v1alpha1
+kind: Validation
+metadata:
+  labels:
+    app.kubernetes.io/name: validation
+    app.kubernetes.io/instance: validation-sample
+    app.kubernetes.io/part-of: validation-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: validation-operator
+  name: validation-sample
+spec:
+  # TODO(user): Add fields here
