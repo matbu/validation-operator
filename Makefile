@@ -29,7 +29,8 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 #
 # For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
 # redhat.com/validation-operator-bundle:$VERSION and redhat.com/validation-operator-catalog:$VERSION.
-IMAGE_TAG_BASE ?= redhat.com/validation-operator
+#IMAGE_TAG_BASE ?= redhat.com/validation-operator
+IMAGE_TAG_BASE ?= matbu/validation-operator
 
 # BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
@@ -37,6 +38,15 @@ BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:v$(VERSION)
 
 # BUNDLE_GEN_FLAGS are the flags passed to the operator-sdk generate bundle command
 BUNDLE_GEN_FLAGS ?= -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
+
+# ansibleee-runner image
+AEEIMG ?= quay.io/ansible/ansible-runner
+
+# validation framework image
+VFIMG ?= matbu/validation-operator
+
+# validations image:
+# VIMG ?= matbu/validation-operator
 
 # USE_IMAGE_DIGESTS defines if images are resolved via tags or digests
 # You can enable this value if you would like to use SHA Based Digests
@@ -47,7 +57,7 @@ ifeq ($(USE_IMAGE_DIGESTS), true)
 endif
 
 # Image URL to use all building/pushing image targets
-IMG ?= controller:latest
+IMG ?= $(IMAGE_TAG_BASE):latest
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.25.0
 
@@ -142,6 +152,20 @@ docker-buildx: test ## Build and push docker image for the manager for cross-pla
 	- docker buildx build --push --platform=$(PLATFORMS) --tag ${IMG} -f Dockerfile.cross
 	- docker buildx rm project-v3-builder
 	rm Dockerfile.cross
+
+##@ Build openstack-ansibleee-runner image
+.PHONY: docker-build-vf
+docker-build-vf:
+	if [ "$VALIDATIONS_LOCAL_DIR" != "" ] ; then \
+		cd validation; podman build -t ${VFIMG} . --volume ${VALIDATIONS_LOCAL_DIR}:/var/tmp/validations:z --build-arg VALIDATIONS_LOCAL_DIR=${VALIDATIONS_LOCAL_DIR}; \
+	else \
+		cd validation; podman build -t ${VFIMG} .; \
+	fi
+
+## Push openstack-ansible-runner image
+.PHONY: docker-push-vf
+docker-push-vf:
+	cd validation; podman push --tls-verify=${VERIFY_TLS} ${VFIMG}
 
 ##@ Deployment
 

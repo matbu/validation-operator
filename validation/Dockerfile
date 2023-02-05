@@ -1,6 +1,5 @@
 ARG USER_REPO=""
 
-
 FROM fedora:35
 
 LABEL name="VF dockerfile"
@@ -30,3 +29,5 @@ ENV ANSIBLE_REMOTE_USER validation
 ENV ANSIBLE_PRIVATE_KEY_FILE /home/validation/containerhost_private_key
 
 USER validation
+
+ENTRYPOINT /usr/local/bin/validation

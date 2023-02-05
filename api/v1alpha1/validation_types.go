@@ -28,6 +28,8 @@ type ValidationSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
+	// Container image for validation
+	ContainerImage string `json:"containerImage"`
 	// Foo is an example field of Validation. Edit validation_types.go to remove/update
 	Foo string `json:"foo,omitempty"`
 }
