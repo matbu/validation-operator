@@ -17,15 +17,24 @@ limitations under the License.
 package controllers
 
 import (
-	"context"
 	"fmt"
 
-	yaml "gopkg.in/yaml.v3"
+	//yaml "gopkg.in/yaml.v3"
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+
+	"context"
+
+	//"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
+	//"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	//"github.com/openstack-k8s-operators/lib-common/modules/storage"
 
 	validationv1alpha1 "github.com/matbu/validation-operator/api/v1alpha1"
 )
@@ -50,7 +59,8 @@ type ValidationReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.13.0/pkg/reconcile
 func (r *ValidationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+
+  //_ = log.FromContext(ctx)
 
 	instance, err := r.getValidationInstance(ctx, req)
 	if err != nil || instance.Name == "" {
@@ -106,16 +116,16 @@ func (r *ValidationReconciler) getValidationInstance(ctx context.Context, req ct
 }
 
 // jobForValidation returns a Validation Job object
-func (r *ValidationReconciler) jobForValidation(instance *redhatcomv1alpha1.Validation) (*batchv1.Job, error) {
+func (r *ValidationReconciler) jobForValidation(instance *validationv1alpha1.Validation) (*batchv1.Job, error) {
 	ls := labelsForValidation(instance.Name)
 
 	args := instance.Spec.Args
 
 	if len(args) == 0 {
 		if len(instance.Spec.Validation) == 0 {
-			instance.Spec.Playbook = "validation.yaml"
+			instance.Spec.Validation = "validation.yaml"
 		}
-		args = []string{"validation", "run", instance.Spec.Playbook}
+		args = []string{"validation", "run", instance.Spec.Validation}
 	}
 
 	job := &batchv1.Job{
@@ -124,8 +134,6 @@ func (r *ValidationReconciler) jobForValidation(instance *redhatcomv1alpha1.Vali
 			Namespace: instance.Namespace,
 		},
 		Spec: batchv1.JobSpec{
-			TTLSecondsAfterFinished: instance.Spec.TTLSecondsAfterFinished,
-			BackoffLimit:            instance.Spec.BackoffLimit,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: ls,
@@ -152,10 +160,26 @@ func (r *ValidationReconciler) jobForValidation(instance *redhatcomv1alpha1.Vali
 	return job, nil
 }
 
+// labelsForValidation returns the labels for selecting the resources
+// belonging to the given ansibleee CR name.
+func labelsForValidation(name string) map[string]string {
+	return map[string]string{"app": "ansibleee", "ansibleee_cr": name}
+}
+
+// getPodNames returns the pod names of the array of pods passed in
+func getPodNames(pods []corev1.Pod) []string {
+	var podNames []string
+	for _, pod := range pods {
+		podNames = append(podNames, pod.Name)
+	}
+	return podNames
+}
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ValidationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&validationv1alpha1.Validation{}).
+		Owns(&batchv1.Job{}).
+		Owns(&corev1.ConfigMap{}).
 		Complete(r)
 }

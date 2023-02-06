@@ -35,6 +35,12 @@ spec:
           spec:
             description: ValidationSpec defines the desired state of Validation
             properties:
+              args:
+                description: Args are the command for the validation executed by the
+                  image. If args is passed, validation is ignored.
+                items:
+                  type: string
+                type: array
               command:
                 description: Command is the command executed by the image
                 items:
@@ -54,6 +60,16 @@ spec:
                 description: Validation is the playbook that ansible will run on this
                   execution
                 type: string
+              restartPolicy:
+                default: OnFailure
+                description: RestartPolicy is the policy applied to the Job on whether
+                  it needs to restart the Pod
+                type: string
+              uid:
+                default: 1001
+                description: Uid is the userid that will be used to run the container
+                format: int64
+                type: integer
             type: object
           status:
             description: ValidationStatus defines the observed state of Validation

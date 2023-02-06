@@ -130,11 +130,11 @@ run: manifests generate fmt vet ## Run a controller from your host.
 # More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 .PHONY: docker-build
 docker-build: test ## Build docker image with the manager.
-	docker build -t ${IMG} .
+	podman build -t ${IMG} .
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
-	docker push ${IMG}
+	podman push ${IMG}
 
 # PLATFORMS defines the target platforms for  the manager image be build to provide support to multiple
 # architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
@@ -153,7 +153,7 @@ docker-buildx: test ## Build and push docker image for the manager for cross-pla
 	- docker buildx rm project-v3-builder
 	rm Dockerfile.cross
 
-##@ Build openstack-ansibleee-runner image
+##@ Build validation image
 .PHONY: docker-build-vf
 docker-build-vf:
 	if [ "$VALIDATIONS_LOCAL_DIR" != "" ] ; then \
@@ -162,7 +162,7 @@ docker-build-vf:
 		cd validation; podman build -t ${VFIMG} .; \
 	fi
 
-## Push openstack-ansible-runner image
+## Push validation image
 .PHONY: docker-push-vf
 docker-push-vf:
 	cd validation; podman push --tls-verify=${VERIFY_TLS} ${VFIMG}

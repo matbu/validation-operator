@@ -1,4 +1,4 @@
-validation/*
+/*
 Copyright 2023.
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -28,6 +28,9 @@ type ValidationSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
+	// RestartPolicy is the policy applied to the Job on whether it needs to restart the Pod
+	// +kubebuilder:default:="OnFailure"
+	RestartPolicy string `json:"restartPolicy,omitempty"`
 	// Container image for validation
 	ContainerImage string `json:"containerImage"`
 	// Playbook is the playbook that ansible will run on this execution
@@ -40,6 +43,11 @@ type ValidationSpec struct {
 	// Name is the name of the internal container inside the pod
 	// +kubebuilder:default:="ansibleee"
 	Name string `json:"name,omitempty"`
+	// Args for the command of the validation
+	Args []string `json:"args,omitempty"`
+	// Uid is the userid that will be used to run the container
+	// +kubebuilder:default:=1001
+	Uid int64 `json:"uid,omitempty"`
 }
 
 // ValidationStatus defines the observed state of Validation
