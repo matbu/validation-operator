@@ -161,9 +161,9 @@ func (r *ValidationReconciler) jobForValidation(instance *validationv1alpha1.Val
 }
 
 // labelsForValidation returns the labels for selecting the resources
-// belonging to the given ansibleee CR name.
+// belonging to the given valdation CR name.
 func labelsForValidation(name string) map[string]string {
-	return map[string]string{"app": "ansibleee", "ansibleee_cr": name}
+	return map[string]string{"app": "validation", "validation_cr": name}
 }
 
 // getPodNames returns the pod names of the array of pods passed in

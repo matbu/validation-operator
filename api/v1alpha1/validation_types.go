@@ -36,12 +36,12 @@ type ValidationSpec struct {
 	// Playbook is the playbook that ansible will run on this execution
 	Validation string `json:"validation,omitempty"`
 	// Image is the container image that will execute the ansible command
-	// +kubebuilder:default:="quay.io/jlarriba/openstack-tripleo-ansible-ee"
+	// +kubebuilder:default:="docker.io/matbu/validation"
 	Image string `json:"image,omitempty"`
 	// Command is the command executed by the image
 	Command []string `json:"command,omitempty"`
 	// Name is the name of the internal container inside the pod
-	// +kubebuilder:default:="ansibleee"
+	// +kubebuilder:default:="validationframework"
 	Name string `json:"name,omitempty"`
 	// Args for the command of the validation
 	Args []string `json:"args,omitempty"`
