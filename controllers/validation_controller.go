@@ -60,7 +60,7 @@ type ValidationReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.13.0/pkg/reconcile
 func (r *ValidationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 
-  //_ = log.FromContext(ctx)
+	//_ = log.FromContext(ctx)
 
 	instance, err := r.getValidationInstance(ctx, req)
 	if err != nil || instance.Name == "" {
