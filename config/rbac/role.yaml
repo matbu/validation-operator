@@ -6,9 +6,9 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
-  - validation.redhat.com
+  - apps
   resources:
-  - validations
+  - deployments
   verbs:
   - create
   - delete
@@ -18,15 +18,46 @@ rules:
   - update
   - watch
 - apiGroups:
-  - validation.redhat.com
+  - batch
   resources:
-  - validations/finalizers
+  - jobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - redhat.com
+  resources:
+  - validation
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - redhat.com
+  resources:
+  - validation/finalizers
   verbs:
   - update
 - apiGroups:
-  - validation.redhat.com
+  - redhat.com
   resources:
-  - validations/status
+  - validation/status
   verbs:
   - get
   - patch
