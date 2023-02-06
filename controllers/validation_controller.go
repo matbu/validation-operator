@@ -49,10 +49,106 @@ type ValidationReconciler struct {
 func (r *ValidationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
 
-	// TODO(user): your logic here
+	instance, err := r.getValidationInstance(ctx, req)
+	if err != nil || instance.Name == "" {
+		return ctrl.Result{}, err
+	}
+
+	// Check if the job already exists, if not create a new one
+	foundJob := &batchv1.Job{}
+	err = r.Get(ctx, types.NamespacedName{Name: instance.Name, Namespace: instance.Namespace}, foundJob)
+	if err != nil && errors.IsNotFound(err) {
+		// Define a new job
+		job, err := r.jobForValidation(instance)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		fmt.Printf("Creating a new Job: Job.Namespace %s Job.Name %s\n", job.Namespace, job.Name)
+		err = r.Create(ctx, job)
+		if err != nil {
+			fmt.Println(err.Error())
+			return ctrl.Result{}, err
+		}
+		fmt.Println("job created successfully - return and requeue")
+		return ctrl.Result{Requeue: true}, nil
+	} else if err != nil {
+		fmt.Println(err.Error())
+		//log.Error(err, "Failed to get Job")
+		return ctrl.Result{}, err
+	}
 
 	return ctrl.Result{}, nil
 }
+
+func (r *ValidationReconciler) getValidationInstance(ctx context.Context, req ctrl.Request) (*validationv1alpha1.Validation, error) {
+	// Fetch the Validation instance
+	instance := &validationv1alpha1.Validation{}
+	err := r.Get(ctx, req.NamespacedName, instance)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			// Request object not found, could have been deleted after reconcile request.
+			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
+			// Return and don't requeue
+			fmt.Println("Validation resource not found. Ignoring since object must be deleted")
+			//log.Info("Validation resource not found. Ignoring since object must be deleted")
+			return &validationv1alpha1.Validation{}, nil
+		}
+		// Error reading the object - requeue the request.
+		fmt.Println(err.Error())
+		//log.Error(err, "Failed to get Validation")
+		return &validationv1alpha1.Validation{}, err
+	}
+
+	return instance, nil
+}
+
+// jobForValidation returns a Validation Job object
+func (r *ValidationReconciler) jobForValidation(instance *redhatcomv1alpha1.Validation) (*batchv1.Job, error) {
+	ls := labelsForValidation(instance.Name)
+
+	args := instance.Spec.Args
+
+	if len(args) == 0 {
+		if len(instance.Spec.Validation) == 0 {
+			instance.Spec.Playbook = "validation.yaml"
+		}
+		args = []string{"validation", "run", instance.Spec.Playbook}
+	}
+
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      instance.Name,
+			Namespace: instance.Namespace,
+		},
+		Spec: batchv1.JobSpec{
+			TTLSecondsAfterFinished: instance.Spec.TTLSecondsAfterFinished,
+			BackoffLimit:            instance.Spec.BackoffLimit,
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: ls,
+				},
+				Spec: corev1.PodSpec{
+					RestartPolicy: corev1.RestartPolicy(instance.Spec.RestartPolicy),
+					Containers: []corev1.Container{{
+						ImagePullPolicy: "Always",
+						Image:           instance.Spec.Image,
+						Name:            instance.Spec.Name,
+						Args:            args,
+					}},
+				},
+			},
+		},
+	}
+
+	// Set Validation instance as the owner and controller
+	err := ctrl.SetControllerReference(instance, job, r.Scheme)
+	if err != nil {
+		return nil, err
+	}
+
+	return job, nil
+}
+
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ValidationReconciler) SetupWithManager(mgr ctrl.Manager) error {

@@ -33,17 +33,37 @@ spec:
           metadata:
             type: object
           spec:
-            description: ValidationSpec defines the desired state of Validation
-            properties:
-              foo:
-                description: Foo is an example field of Validation. Edit validation_types.go
-                  to remove/update
+              command:
+                description: Command is the command executed by the image
+                items:
+                  type: string
+                type: array
+              image:
+                default: docker.io/matbu/validation
+                description: Image is the container image that will execute the validation
+                  command
+                type: string
+              name:
+                default: validation
+                description: Name is the name of the internal container inside the
+                  pod
+                type: string
+              validation:
+                description: Validation is the playbook that ansible will run on this
+                  execution
                 type: string
             type: object
           status:
             description: ValidationStatus defines the observed state of Validation
+            properties:
+              nodes:
+                description: Nodes are the names of the Validation pods
+                items:
+                  type: string
+                type: array
+            required:
+            - nodes
             type: object
-        type: object
     served: true
     storage: true
     subresources:
