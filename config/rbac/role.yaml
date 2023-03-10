@@ -6,21 +6,9 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
-  - batch
+  - apps
   resources:
-  - jobs
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - configmaps
+  - deployments
   verbs:
   - create
   - delete

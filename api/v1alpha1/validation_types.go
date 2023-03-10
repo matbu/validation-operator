@@ -28,8 +28,12 @@ type ValidationSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// RestartPolicy is the policy applied to the Job on whether it needs to restart the Pod
-	// +kubebuilder:default:="OnFailure"
+	// Size is the size of the ansibleee deployment
+	Size int32 `json:"size"`
+	// Command string `json:"command"`
+
+	//RestartPolicy is the policy applied to the Job on whether it needs to restart the Pod
+	//+kubebuilder:default:="OnFailure"
 	RestartPolicy string `json:"restartPolicy,omitempty"`
 	// Container image for validation
 	ContainerImage string `json:"containerImage"`
@@ -48,12 +52,6 @@ type ValidationSpec struct {
 	// Uid is the userid that will be used to run the container
 	// +kubebuilder:default:=1001
 	Uid int64 `json:"uid,omitempty"`
-}
-
-// ValidationStatus defines the observed state of Validation
-type ValidationStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
 }
 
 //+kubebuilder:object:root=true
@@ -75,6 +73,15 @@ type ValidationList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []Validation `json:"items"`
+}
+
+// ValidationStatus defines the observed state of Validation
+type ValidationStatus struct {
+	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
+	// Important: Run "make" to regenerate code after modifying this file
+
+	// Nodes are the names of the validation pods
+	Nodes []string `json:"nodes"`
 }
 
 func init() {

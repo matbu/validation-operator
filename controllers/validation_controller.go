@@ -17,18 +17,16 @@ limitations under the License.
 package controllers
 
 import (
-	"fmt"
 
 	//yaml "gopkg.in/yaml.v3"
-	batchv1 "k8s.io/api/batch/v1"
+	"context"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"reflect"
 
-	"context"
-
-	//"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
 	//"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -62,78 +60,128 @@ func (r *ValidationReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	//_ = log.FromContext(ctx)
 
-	instance, err := r.getValidationInstance(ctx, req)
-	if err != nil || instance.Name == "" {
-		return ctrl.Result{}, err
-	}
-
-	// Check if the job already exists, if not create a new one
-	foundJob := &batchv1.Job{}
-	err = r.Get(ctx, types.NamespacedName{Name: instance.Name, Namespace: instance.Namespace}, foundJob)
-	if err != nil && errors.IsNotFound(err) {
-		// Define a new job
-		job, err := r.jobForValidation(instance)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-		fmt.Printf("Creating a new Job: Job.Namespace %s Job.Name %s\n", job.Namespace, job.Name)
-		err = r.Create(ctx, job)
-		if err != nil {
-			fmt.Println(err.Error())
-			return ctrl.Result{}, err
-		}
-		fmt.Println("job created successfully - return and requeue")
-		return ctrl.Result{Requeue: true}, nil
-	} else if err != nil {
-		fmt.Println(err.Error())
-		//log.Error(err, "Failed to get Job")
-		return ctrl.Result{}, err
-	}
-
-	return ctrl.Result{}, nil
-}
-
-func (r *ValidationReconciler) getValidationInstance(ctx context.Context, req ctrl.Request) (*validationv1alpha1.Validation, error) {
 	// Fetch the Validation instance
-	instance := &validationv1alpha1.Validation{}
-	err := r.Get(ctx, req.NamespacedName, instance)
+	validation := &validationv1alpha1.Validation{}
+	err := r.Get(ctx, req.NamespacedName, validation)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
 			// Return and don't requeue
-			fmt.Println("Validation resource not found. Ignoring since object must be deleted")
-			//log.Info("Validation resource not found. Ignoring since object must be deleted")
-			return &validationv1alpha1.Validation{}, nil
+			return ctrl.Result{}, nil
 		}
-		// Error reading the object - requeue the request.
-		fmt.Println(err.Error())
-		//log.Error(err, "Failed to get Validation")
-		return &validationv1alpha1.Validation{}, err
+		return ctrl.Result{}, err
 	}
 
-	return instance, nil
+	// Check if the dep already exists, if not create a new one
+	found := &appsv1.Deployment{}
+	err = r.Get(ctx, types.NamespacedName{Name: validation.Name, Namespace: validation.Namespace}, found)
+	if err != nil && errors.IsNotFound(err) {
+		// Define a new dep
+		dep := r.deploymentForValidation(validation)
+
+		err = r.Create(ctx, dep)
+		if err != nil {
+			//fmt.Println(err.Error())
+			return ctrl.Result{}, err
+		}
+
+		return ctrl.Result{Requeue: true}, nil
+	} else if err != nil {
+		//fmt.Println(err.Error())
+
+		return ctrl.Result{}, err
+	}
+
+	// Ensure the deployment size is the same as the spec
+	size := validation.Spec.Size
+	if *found.Spec.Replicas != size {
+		found.Spec.Replicas = &size
+		err = r.Update(ctx, found)
+		if err != nil {
+			//fmt.Println(err.Error())
+			//log.Error(err, "Failed to update Deployment", "Deployment.Namespace", found.Namespace, "Deployment.Name", found.Name)
+			return ctrl.Result{}, err
+		}
+		// Spec updated - return and requeue
+		return ctrl.Result{Requeue: true}, nil
+	}
+
+	// Update the Validation status with the pod names
+	// List the pods for this validation's deployment
+	podList := &corev1.PodList{}
+	listOpts := []client.ListOption{
+		client.InNamespace(validation.Namespace),
+		client.MatchingLabels(labelsForValidation(validation.Name)),
+	}
+	if err = r.List(ctx, podList, listOpts...); err != nil {
+		//fmt.Println(err.Error())
+		//log.Error(err, "Failed to list pods", "validation.Namespace", validation.Namespace, "validation.Name", validation.Name)
+		return ctrl.Result{}, err
+	}
+	podNames := getPodNames(podList.Items)
+
+	// Update status.Nodes if needed
+	if !reflect.DeepEqual(podNames, validation.Status.Nodes) {
+		validation.Status.Nodes = podNames
+		err := r.Status().Update(ctx, validation)
+		if err != nil {
+			//fmt.Println(err.Error())
+			//log.Error(err, "Failed to update validation status")
+			return ctrl.Result{}, err
+		}
+	}
+
+	return ctrl.Result{}, nil
+
 }
 
+// func (r *ValidationReconciler) getValidationInstance(ctx context.Context, req ctrl.Request) (*validationv1alpha1.Validation, error) {
+// 	// Fetch the Validation instance
+// 	instance := &validationv1alpha1.Validation{}
+// 	err := r.Get(ctx, req.NamespacedName, instance)
+// 	if err != nil {
+// 		if errors.IsNotFound(err) {
+// 			// Request object not found, could have been deleted after reconcile request.
+// 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
+// 			// Return and don't requeue
+// 			fmt.Println("Validation resource not found. Ignoring since object must be deleted")
+// 			//log.Info("Validation resource not found. Ignoring since object must be deleted")
+// 			return &validationv1alpha1.Validation{}, nil
+// 		}
+// 		// Error reading the object - requeue the request.
+// 		fmt.Println(err.Error())
+// 		//log.Error(err, "Failed to get Validation")
+// 		return &validationv1alpha1.Validation{}, err
+// 	}
+//
+// 	return instance, nil
+// }
+
 // jobForValidation returns a Validation Job object
-func (r *ValidationReconciler) jobForValidation(instance *validationv1alpha1.Validation) (*batchv1.Job, error) {
+func (r *ValidationReconciler) deploymentForValidation(instance *validationv1alpha1.Validation) *appsv1.Deployment {
 	ls := labelsForValidation(instance.Name)
 
+	replicas := instance.Spec.Size
 	args := instance.Spec.Args
+	command := instance.Spec.Command
+	// if len(args) == 0 {
+	// 	if len(instance.Spec.Validation) == 0 {
+	// 		instance.Spec.Validation = "validation.yaml"
+	// 	}
+	// 	args = []string{"validation", "run", instance.Spec.Validation}
+	// }
 
-	if len(args) == 0 {
-		if len(instance.Spec.Validation) == 0 {
-			instance.Spec.Validation = "validation.yaml"
-		}
-		args = []string{"validation", "run", instance.Spec.Validation}
-	}
-
-	job := &batchv1.Job{
+	dep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      instance.Name,
 			Namespace: instance.Namespace,
 		},
-		Spec: batchv1.JobSpec{
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &replicas,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: ls,
+			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: ls,
@@ -144,6 +192,7 @@ func (r *ValidationReconciler) jobForValidation(instance *validationv1alpha1.Val
 						ImagePullPolicy: "Always",
 						Image:           instance.Spec.Image,
 						Name:            instance.Spec.Name,
+						Command:         command,
 						Args:            args,
 					}},
 				},
@@ -152,12 +201,8 @@ func (r *ValidationReconciler) jobForValidation(instance *validationv1alpha1.Val
 	}
 
 	// Set Validation instance as the owner and controller
-	err := ctrl.SetControllerReference(instance, job, r.Scheme)
-	if err != nil {
-		return nil, err
-	}
-
-	return job, nil
+	ctrl.SetControllerReference(instance, dep, r.Scheme)
+	return dep
 }
 
 // labelsForValidation returns the labels for selecting the resources
@@ -179,7 +224,6 @@ func getPodNames(pods []corev1.Pod) []string {
 func (r *ValidationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&validationv1alpha1.Validation{}).
-		Owns(&batchv1.Job{}).
-		Owns(&corev1.ConfigMap{}).
+		Owns(&appsv1.Deployment{}).
 		Complete(r)
 }
